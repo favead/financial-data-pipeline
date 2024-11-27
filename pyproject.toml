@@ -20,7 +20,7 @@ name = "PyPI"
 priority = "primary"
 
 [tool.poetry.scripts]
-pdf2txt = "financial_data.process.pdf2txt:main"
+pdf2txt = "financial_data.preprocessing.pdf2txt:main"
 
 [build-system]
 requires = ["poetry-core"]
