@@ -13,13 +13,14 @@ seaborn = "^0.12.2"
 hydra-core = "^1.3.2"
 pytest = "^7.4.0"
 pymupdf = "^1.24.14"
+pymupdf4llm = "^0.0.17"
 
 [[tool.poetry.source]]
 name = "PyPI"
 priority = "primary"
 
 [tool.poetry.scripts]
-pdf2txt = "financial_data.process.pdf2txt:main"
+pdf2txt = "financial_data.preprocessing.pdf2txt:main"
 
 [build-system]
 requires = ["poetry-core"]
