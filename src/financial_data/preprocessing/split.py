@@ -4,10 +4,12 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import click
-from langchain_text_splitters import MarkdownHeaderTextSplitter
+from langchain_text_splitters import (
+    MarkdownHeaderTextSplitter,
+)
 
 
-def initialize_text_splitter(
+def initialize_md_text_splitter(
     split_config: Dict[str, Any]
 ) -> MarkdownHeaderTextSplitter:
     return MarkdownHeaderTextSplitter(
@@ -16,15 +18,52 @@ def initialize_text_splitter(
 
 
 def split_by_config(
-    data_filepaths: List[Path], split_config: Dict[str, Any]
+    data_filepaths: List[Path],
+    split_config: Dict[str, Any],
 ) -> Dict[str, List[str]]:
+    """
+    Split text in directory into chunks with size more than 80% of chunk_size
+    by markdown headers
+
+    Parameters
+    ----------
+    data_filepaths: List[Path]
+        Paths to the txt files to split
+    split_config: Dict[str, Any]
+        Split config
+
+    Returns
+    -------
+    Dict[str, List[str]]
+        Dictionary with filename as key and list of chunks as value
+    """
     chunks_with_filenames = {}
-    splitter = initialize_text_splitter(split_config)
+    min_size = int(0.8 * split_config["chunk_size"])
+    md_splitter = initialize_md_text_splitter(split_config)
     for data_filepath in data_filepaths:
         filename = data_filepath.name
-        chunks = splitter.split_text(data_filepath.read_text())
+        chunks = md_splitter.split_text(data_filepath.read_text())
         chunks = [chunk.page_content for chunk in chunks]
-        chunks_with_filenames[filename] = chunks
+        processed_chunks = []
+        temp_chunk = ""
+
+        for chunk in chunks:
+            # Если текущий чанк слишком маленький, добавляем к временному
+            if len(chunk) + len(temp_chunk) < min_size:
+                temp_chunk += "\n" + chunk
+            else:
+                # Если временный чанк не пустой, сохраняем его
+                if temp_chunk:
+                    processed_chunks.append(temp_chunk.strip())
+                    temp_chunk = ""
+                # Добавляем текущий чанк
+                processed_chunks.append(chunk.strip())
+
+        # Добавляем оставшийся временный чанк
+        if temp_chunk:
+            processed_chunks.append(temp_chunk.strip())
+
+        chunks_with_filenames[filename] = processed_chunks
     return chunks_with_filenames
 
 
