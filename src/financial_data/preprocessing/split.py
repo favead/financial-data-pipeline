@@ -48,16 +48,21 @@ def split_by_config(
         temp_chunk = ""
 
         for chunk in chunks:
-            # Если текущий чанк слишком маленький, добавляем к временному
-            if len(chunk) + len(temp_chunk) < min_size:
-                temp_chunk += "\n" + chunk
+            # Проверяем размер текущего чанка
+            if len(chunk) < min_size:
+                # Если текущий чанк маленький, добавляем его к временному
+                temp_chunk = (
+                    (temp_chunk + "\n" + chunk).strip()
+                    if temp_chunk
+                    else chunk
+                )
             else:
-                # Если временный чанк не пустой, сохраняем его
-                if temp_chunk:
-                    processed_chunks.append(temp_chunk.strip())
+                # Если временный чанк существует, сохраняем его
+                if temp_chunk and len(temp_chunk) > min_size:
+                    processed_chunks.append(temp_chunk)
                     temp_chunk = ""
-                # Добавляем текущий чанк
-                processed_chunks.append(chunk.strip())
+                # Сохраняем текущий большой чанк
+                processed_chunks.append(chunk)
 
         # Добавляем оставшийся временный чанк
         if temp_chunk:
