@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
-from typing import Dict, List, Optional, Pattern, Tuple
+from typing import Dict, List, Optional, Pattern, Tuple, Union
 
 import click
 
@@ -33,7 +33,9 @@ class TextProcessingPatterns:
     inline_patterns: List[Optional[Pattern]]
 
     @classmethod
-    def from_config(cls, config: Dict) -> "TextProcessingPatterns":
+    def from_config(
+        cls, config: Dict[str, Union[str, List[Dict[str, str]]]]
+    ) -> "TextProcessingPatterns":
         remove_patterns = config.get("remove_patterns", {})
         return cls(
             before_first_chapter=RegexPattern(
@@ -50,7 +52,7 @@ class TextProcessingPatterns:
                     "from": RegexPattern(chapter.get("from")).compile(),
                     "to": RegexPattern(chapter.get("to")).compile(),
                 }
-                for chapter in remove_patterns.get("in_chapters", [{}])
+                for chapter in remove_patterns.get("in_chapters", [])
             ],
             inline_patterns=[
                 RegexPattern(pattern.get("pattern")).compile()
@@ -67,16 +69,6 @@ class TextLineProcessor:
         self.current_chapter = None
 
     def should_process_line(self, line: str) -> bool:
-        if self._check_before_first_chapter(line):
-            self.before_first_chapter_passed = True
-            return True
-
-        if self._check_after_last_chapter(line):
-            return False
-
-        if not self.before_first_chapter_passed:
-            return False
-
         if self.current_chapter:
             self.ignore_text = self._check_in_chapters_to(line)
             if not self.ignore_text:
@@ -91,16 +83,22 @@ class TextLineProcessor:
 
         return not self._check_inline_patterns(line) and len(line.strip()) > 0
 
-    def _check_before_first_chapter(self, line: str) -> bool:
-        return bool(
+    def check_before_first_chapter(self, line: str) -> bool:
+        self.before_first_chapter_passed = bool(
             self.patterns.before_first_chapter
             and self.patterns.before_first_chapter.match(line)
         )
 
-    def _check_after_last_chapter(self, line: str) -> bool:
+    def check_after_last_chapter(self, line: str) -> bool:
         return bool(
             self.patterns.after_last_chapter
             and self.patterns.after_last_chapter.match(line)
+        )
+
+    def check_chapter_start(self, line: str) -> bool:
+        return bool(
+            self.patterns.chapter_separator
+            and self.patterns.chapter_separator.match(line)
         )
 
     def _check_inline_patterns(self, line: str) -> bool:
@@ -138,6 +136,13 @@ class TextFileProcessor:
         with open(input_path, "r", encoding="utf-8") as f:
             for line in f:
                 total_length += len(line)
+                if self.line_processor.check_chapter_start(line):
+                    processed_text.append(line)
+                if not self.line_processor.before_first_chapter_passed:
+                    self.line_processor.check_before_first_chapter(line)
+                    continue
+                if self.line_processor.check_after_last_chapter(line):
+                    break
                 if self.line_processor.should_process_line(line):
                     processed_text.append(line)
 
@@ -153,7 +158,6 @@ class TextFileProcessor:
             f.write(result)
 
 
-# CLI interface remains the same
 @click.command()
 @click.option(
     "--pdf_dir",
