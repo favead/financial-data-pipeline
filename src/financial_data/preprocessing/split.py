@@ -1,113 +1,107 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
-import click
+from langchain_core.load import dumpd
+from langchain_core.documents import Document
 from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
+    HTMLSectionSplitter,
 )
+from transformers import AutoTokenizer
 
 
-def initialize_md_text_splitter(
-    split_config: Dict[str, Any]
-) -> MarkdownHeaderTextSplitter:
-    return MarkdownHeaderTextSplitter(
-        headers_to_split_on=split_config["headers_to_split_on"],
-    )
+class ChunkSplitter:
+    def __init__(
+        self,
+        min_size: int,
+        model_path: str,
+    ) -> None:
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.min_size = min_size
 
+    def split(
+        self, filepath: Path, splitter_config: Dict[str, Any]
+    ) -> List[Document]:
+        _, file_ext = os.path.splitext(str(filepath))
+        md_splitter = self._get_md_splitter(file_ext, splitter_config)
+        with open(filepath, "r") as f:
+            filedata = f.read()
+        documents = md_splitter.split_text(filedata)
+        return documents
 
-def split_by_config(
-    data_filepaths: List[Path],
-    split_config: Dict[str, Any],
-) -> Dict[str, List[str]]:
-    """
-    Split text in directory into chunks with size more than 80% of chunk_size
-    by markdown headers
+    def _get_md_splitter(
+        self, file_ext: str, splitter_config: Dict[str, Any]
+    ) -> Union[MarkdownHeaderTextSplitter, HTMLSectionSplitter]:
+        return MarkdownHeaderTextSplitter(**splitter_config)
 
-    Parameters
-    ----------
-    data_filepaths: List[Path]
-        Paths to the txt files to split
-    split_config: Dict[str, Any]
-        Split config
-
-    Returns
-    -------
-    Dict[str, List[str]]
-        Dictionary with filename as key and list of chunks as value
-    """
-    chunks_with_filenames = {}
-    min_size = int(0.8 * split_config["chunk_size"])
-    md_splitter = initialize_md_text_splitter(split_config)
-    for data_filepath in data_filepaths:
-        filename = data_filepath.name
-        chunks = md_splitter.split_text(data_filepath.read_text())
-        chunks = [chunk.page_content for chunk in chunks]
-        processed_chunks = []
-        temp_chunk = ""
-
-        for chunk in chunks:
-            # Проверяем размер текущего чанка
-            if len(chunk) < min_size:
-                # Если текущий чанк маленький, добавляем его к временному
-                temp_chunk = (
-                    (temp_chunk + "\n" + chunk).strip()
-                    if temp_chunk
+    def squeeze_chunks(self, documents: List[Document]) -> List[Document]:
+        squeezed_chunks = []
+        temp_document = Document("")
+        for document in documents:
+            chunk = document.page_content
+            tokens = self.tokenizer.tokenize(chunk)
+            n_tokens = len(tokens)
+            if n_tokens < self.min_size:
+                temp_document.page_content = (
+                    (temp_document.page_content + "\n" + chunk).strip()
+                    if temp_document.page_content
                     else chunk
                 )
             else:
-                # Если временный чанк существует, сохраняем его
-                if temp_chunk and len(temp_chunk) > min_size:
-                    processed_chunks.append(temp_chunk)
-                    temp_chunk = ""
-                # Сохраняем текущий большой чанк
-                processed_chunks.append(chunk)
+                if (
+                    temp_document.page_content
+                    and len(temp_document.page_content) > self.min_size
+                ):
+                    squeezed_chunks.append(temp_document)
+                    temp_document = Document("")
+                squeezed_chunks.append(document)
 
-        # Добавляем оставшийся временный чанк
-        if temp_chunk:
-            processed_chunks.append(temp_chunk.strip())
-
-        chunks_with_filenames[filename] = processed_chunks
-    return chunks_with_filenames
+        if temp_document.page_content:
+            squeezed_chunks.append(temp_document)
+        return squeezed_chunks
 
 
-@click.command()
-@click.option("--data_dir", type=click.Path(exists=True))
-@click.option("--split_config_path", type=click.Path(exists=True))
-@click.option("--output_dir", type=click.Path(exists=False))
-def main(data_dir: str, split_config_path: str, output_dir: str) -> None:
+def split_documents_by_dir(
+    data_dir: Path,
+    min_size: int = 300,
+    model_path: str = "intfloat/multilingual-e5-large",
+) -> None:
+    splitter = ChunkSplitter(min_size, model_path)
+    chunks_meta = {}
+    for files_dir in data_dir.iterdir():
+        dirname = files_dir.name
+        chunks_meta[dirname] = []
+        splitter_config_path = list(files_dir.glob("*.json"))
+        assert len(splitter_config_path) == 1
+        with open(splitter_config_path[0], "r") as f:
+            splitter_config = json.load(f)
+        for filepath in files_dir.iterdir():
+            if filepath.is_file() and filepath.suffix != ".json":
+                chunks = splitter.split(filepath, splitter_config)
+                chunks_meta[dirname].extend(chunks)
+
+        chunks_meta[dirname] = splitter.squeeze_chunks(chunks_meta[dirname])
+    return chunks_meta
+
+
+def split_documents() -> None:
     """
-    Read all txt files and split them according to the specified config.
-    After that save the chunks in output directory
-
-    Parameters
-    ----------
-    data_dir: str
-        Path to the directory with txt files to split
-    split_config_path: str
-        Path to the json file with split config
-    output_dir: str
-        Path to the directory to save the chunks
-
-    Returns
-    -------
-    None
+    Split documents from /data/to_split directory to chunks
+    and store it in /data/chunks
     """
-    data_dir: Path = Path(data_dir)
-    output_dir: Path = Path(output_dir)
-
-    os.makedirs(output_dir, exist_ok=True)
-    with open(split_config_path, "r") as f:
-        split_config = json.load(f)
-    data_filepaths = list(data_dir.glob("*.txt"))
-    chunks_with_filenames = split_by_config(data_filepaths, split_config)
-    for input_filename, chunks in chunks_with_filenames.items():
-        for i, chunk in enumerate(chunks):
-            output_filepath = output_dir / f"{input_filename}_{i}.txt"
-            output_filepath.write_text(chunk, "utf-8")
+    model_path = "intfloat/multilingual-e5-small"
+    data_dir: Path = Path("./data/test")
+    output_dir: Path = Path("./data/chunks")
+    chunks_meta = split_documents_by_dir(data_dir, model_path=model_path)
+    documents = []
+    for dirname, chunk_docs in chunks_meta.items():
+        with open(output_dir / f"{dirname}.json", "w") as f:
+            json.dump({"documents": dumpd(chunk_docs)}, f)
+        documents.extend(chunk_docs)
     return None
 
 
 if __name__ == "__main__":
-    main()
+    split_documents()
