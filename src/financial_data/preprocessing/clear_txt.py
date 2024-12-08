@@ -69,39 +69,39 @@ class TextLineProcessor:
     def should_process_line(self, line: str) -> bool:
         if self.current_chapter:
             self.ignore_text = self._check_in_chapters_to(line)
-            if not self.ignore_text:
-                self.current_chapter = None
-            return False
+            if self.ignore_text:
+                return False
 
         self.ignore_text, self.current_chapter = self._check_in_chapters_from(
             line
         )
+
         if self.ignore_text:
             return False
 
         return not self._check_inline_patterns(line) and len(line.strip()) > 0
 
     def check_before_first_chapter(self, line: str) -> bool:
-        self.before_first_chapter_passed = bool(
+        return bool(
             self.patterns.before_first_chapter
-            and self.patterns.before_first_chapter.match(line)
+            and self.patterns.before_first_chapter.search(line)
         )
 
     def check_after_last_chapter(self, line: str) -> bool:
         return bool(
             self.patterns.after_last_chapter
-            and self.patterns.after_last_chapter.match(line)
+            and self.patterns.after_last_chapter.search(line)
         )
 
     def check_chapter_start(self, line: str) -> bool:
         return bool(
             self.patterns.chapter_separator
-            and self.patterns.chapter_separator.match(line)
+            and self.patterns.chapter_separator.search(line)
         )
 
     def _check_inline_patterns(self, line: str) -> bool:
         return any(
-            pattern and pattern.match(line)
+            pattern and pattern.search(line)
             for pattern in self.patterns.inline_patterns
         )
 
@@ -109,7 +109,7 @@ class TextLineProcessor:
         self, line: str
     ) -> Tuple[bool, Optional[Dict[str, Pattern]]]:
         for pattern in self.patterns.in_chapters:
-            if pattern["from"] and pattern["from"].match(line):
+            if pattern["from"] and pattern["from"].search(line):
                 return True, pattern
         return False, None
 
@@ -117,7 +117,7 @@ class TextLineProcessor:
         return not bool(
             self.current_chapter
             and self.current_chapter["to"]
-            and self.current_chapter["to"].match(line)
+            and self.current_chapter["to"].search(line)
         )
 
 
@@ -126,7 +126,7 @@ class TextFileProcessor:
         self.line_processor = TextLineProcessor(patterns)
 
     def process_file(self, input_path: Path, output_path: Path) -> None:
-        # print(f"Processing text data from {input_path}")
+        print(f"Processing text data from {input_path}")
 
         processed_text = []
         total_length = 0
@@ -134,26 +134,24 @@ class TextFileProcessor:
         with open(input_path, "r", encoding="utf-8") as f:
             for line in f:
                 total_length += len(line)
-                if self.line_processor.check_chapter_start(line):
-                    processed_text.append(line)
+                if self.line_processor.check_before_first_chapter(line):
+                    self.line_processor.before_first_chapter_passed = True
                 if not self.line_processor.before_first_chapter_passed:
-                    self.line_processor.check_before_first_chapter(line)
                     continue
                 if self.line_processor.check_after_last_chapter(line):
                     break
+                if self.line_processor.check_chapter_start(line):
+                    self.line_processor.current_chapter = None
                 if self.line_processor.should_process_line(line):
                     processed_text.append(line)
-
-                if len(processed_text) > 0:
-                    print(processed_text[-1])
 
         result = "".join(processed_text)
         result_len = len(result)
 
-        # print(
-        #     f"Original file length: {total_length}, "
-        #     f"processed file length: {result_len}"
-        # )
+        print(
+            f"Original file length: {total_length}, "
+            f"processed file length: {result_len}"
+        )
 
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result)
@@ -165,8 +163,8 @@ def clear_txt() -> None:
     which is specified in the meta.json file in each textbook directory.
     After processing, save the processed text to the processed directory.
     """
-    txt_dir: Path = Path("./data/test")
-    output_dir: Path = Path("./data/to_split_v2")
+    txt_dir: Path = Path("./data/txt_data")
+    output_dir: Path = Path("./data/to_split")
     os.makedirs(output_dir, exist_ok=True)
 
     for txt_data_dir in txt_dir.iterdir():
@@ -178,13 +176,12 @@ def clear_txt() -> None:
             processing_config = json.load(f)
 
         patterns = TextProcessingPatterns.from_config(processing_config)
-        print(patterns)
-        processor = TextFileProcessor(patterns)
         output_subdir = output_dir / txt_data_dir.name
         os.makedirs(output_subdir, exist_ok=True)
 
         for txt_file in txt_data_dir.iterdir():
             if txt_file.is_file() and txt_file.suffix != ".json":
+                processor = TextFileProcessor(patterns)
                 processor.process_file(txt_file, output_subdir / txt_file.name)
 
 
