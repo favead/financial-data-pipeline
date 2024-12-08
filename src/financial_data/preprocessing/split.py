@@ -1,74 +1,49 @@
 import json
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
-from langchain_core.load import dumpd
 from langchain_core.documents import Document
 from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
-    HTMLSectionSplitter,
+    RecursiveCharacterTextSplitter,
 )
-from transformers import AutoTokenizer
+
+from ..utils.jsonl import save_documents_to_jsonl
 
 
 class ChunkSplitter:
     def __init__(
         self,
-        min_size: int,
-        model_path: str,
+        chunk_size: int,
     ) -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.min_size = min_size
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size, chunk_overlap=int(0.15 * chunk_size)
+        )
 
     def split(
         self, filepath: Path, splitter_config: Dict[str, Any]
     ) -> List[Document]:
-        _, file_ext = os.path.splitext(str(filepath))
-        md_splitter = self._get_md_splitter(file_ext, splitter_config)
+        md_splitter = self._get_md_splitter(splitter_config)
         with open(filepath, "r") as f:
             filedata = f.read()
         documents = md_splitter.split_text(filedata)
+        documents = self.text_splitter.split_documents(documents)
         return documents
 
     def _get_md_splitter(
-        self, file_ext: str, splitter_config: Dict[str, Any]
-    ) -> Union[MarkdownHeaderTextSplitter, HTMLSectionSplitter]:
+        self, splitter_config: Dict[str, Any]
+    ) -> MarkdownHeaderTextSplitter:
         return MarkdownHeaderTextSplitter(**splitter_config)
 
-    def squeeze_chunks(self, documents: List[Document]) -> List[Document]:
-        squeezed_chunks = []
-        temp_document = Document("")
-        for document in documents:
-            chunk = document.page_content
-            tokens = self.tokenizer.tokenize(chunk)
-            n_tokens = len(tokens)
-            if n_tokens < self.min_size:
-                temp_document.page_content = (
-                    (temp_document.page_content + "\n" + chunk).strip()
-                    if temp_document.page_content
-                    else chunk
-                )
-            else:
-                if (
-                    temp_document.page_content
-                    and len(temp_document.page_content) > self.min_size
-                ):
-                    squeezed_chunks.append(temp_document)
-                    temp_document = Document("")
-                squeezed_chunks.append(document)
-
-        if temp_document.page_content:
-            squeezed_chunks.append(temp_document)
-        return squeezed_chunks
+    def squeeze(self, documents: List[Document]) -> List[Document]:
+        pass
 
 
 def split_documents_by_dir(
     data_dir: Path,
-    min_size: int = 300,
-    model_path: str = "intfloat/multilingual-e5-large",
+    chunk_size: int = 1500,
 ) -> None:
-    splitter = ChunkSplitter(min_size, model_path)
+    splitter = ChunkSplitter(chunk_size)
     chunks_meta = {}
     for files_dir in data_dir.iterdir():
         dirname = files_dir.name
@@ -81,8 +56,6 @@ def split_documents_by_dir(
             if filepath.is_file() and filepath.suffix != ".json":
                 chunks = splitter.split(filepath, splitter_config)
                 chunks_meta[dirname].extend(chunks)
-
-        chunks_meta[dirname] = splitter.squeeze_chunks(chunks_meta[dirname])
     return chunks_meta
 
 
@@ -91,15 +64,13 @@ def split_documents() -> None:
     Split documents from /data/to_split directory to chunks
     and store it in /data/chunks
     """
-    model_path = "intfloat/multilingual-e5-small"
-    data_dir: Path = Path("./data/test")
+    data_dir: Path = Path("./data/to_split")
     output_dir: Path = Path("./data/chunks")
-    chunks_meta = split_documents_by_dir(data_dir, model_path=model_path)
-    documents = []
+    chunks_meta: Dict[str, List[Document]] = split_documents_by_dir(data_dir)
     for dirname, chunk_docs in chunks_meta.items():
-        with open(output_dir / f"{dirname}.json", "w") as f:
-            json.dump({"documents": dumpd(chunk_docs)}, f)
-        documents.extend(chunk_docs)
+        save_documents_to_jsonl(
+            chunk_docs, str(output_dir / f"{dirname}.jsonl")
+        )
     return None
 
 
