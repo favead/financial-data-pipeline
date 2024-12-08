@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-import click
 import pymupdf4llm
 
 
@@ -52,45 +51,24 @@ def get_pdf_file(textbook_dir: Path, raw_txt_path: Path) -> Path | None:
     return pdf_file_path
 
 
-@click.command()
-@click.option(
-    "--pdf_dir",
-    type=click.Path(exists=True),
-    help="Path to the PDF directory",
-)
-@click.option(
-    "--txt_dir",
-    type=click.Path(),
-    help="Path to the txt directory",
-)
-def main(pdf_dir: str, txt_dir: str) -> None:
+def pdf2txt() -> None:
     """
     Convert PDF files to text files.
-
-    Parameters:
-    ----------
-    pdf_path: str
-        Path to the PDF directory.
-    txt_dir: str
-        Path to the txt directory.
-
-    Returns:
-    -------
-    None
     """
-    pdf_dir: Path = Path(pdf_dir)
-    txt_dir: Path = Path(txt_dir)
-    os.makedirs(txt_dir / "raw", exist_ok=True)
-    for textbook_dir in pdf_dir.iterdir():
+    pdf_dir: Path = Path("./data/pdf_textbooks")
+    txt_dir: Path = Path("./data/txt_data")
+    for i, textbook_dir in enumerate(pdf_dir.iterdir()):
         if not textbook_dir.is_dir():
             continue
         pdf_file = get_pdf_file(textbook_dir, txt_dir)
         if pdf_file is None:
             continue
-        raw_txt_file_path = txt_dir / "raw" / (textbook_dir.name + ".txt")
+        txt_file_dir = txt_dir / textbook_dir.name
+        os.makedirs(txt_file_dir, exist_ok=True)
+        raw_txt_file_path = txt_file_dir / f"{i}.txt"
         convert_pdf_to_txt(pdf_file, raw_txt_file_path)
     return None
 
 
 if __name__ == "__main__":
-    main()
+    pdf2txt()
