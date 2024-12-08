@@ -5,8 +5,6 @@ from pathlib import Path
 import re
 from typing import Dict, List, Optional, Pattern, Tuple, Union
 
-import click
-
 
 @dataclass
 class RegexPattern:
@@ -128,7 +126,7 @@ class TextFileProcessor:
         self.line_processor = TextLineProcessor(patterns)
 
     def process_file(self, input_path: Path, output_path: Path) -> None:
-        print(f"Processing text data from {input_path}")
+        # print(f"Processing text data from {input_path}")
 
         processed_text = []
         total_length = 0
@@ -146,56 +144,33 @@ class TextFileProcessor:
                 if self.line_processor.should_process_line(line):
                     processed_text.append(line)
 
+                if len(processed_text) > 0:
+                    print(processed_text[-1])
+
         result = "".join(processed_text)
         result_len = len(result)
 
-        print(
-            f"Original file length: {total_length}, "
-            f"processed file length: {result_len}"
-        )
+        # print(
+        #     f"Original file length: {total_length}, "
+        #     f"processed file length: {result_len}"
+        # )
 
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result)
 
 
-@click.command()
-@click.option(
-    "--pdf_dir",
-    type=click.Path(exists=True),
-    help="Path to the pdf directory",
-)
-@click.option(
-    "--txt_dir",
-    type=click.Path(exists=True),
-    help="Path to the txt directory",
-)
-def main(pdf_dir: str, txt_dir: str) -> None:
+def clear_txt() -> None:
     """
     Preprocess text data from raw txt files with cleaning configuration,
     which is specified in the meta.json file in each textbook directory.
     After processing, save the processed text to the processed directory.
-
-    Parameters:
-    ----------
-    pdf_dir: str
-        Path to the pdf directory.
-    txt_dir: str
-        Path to the txt directory.
-
-    Returns:
-    -------
-    None
     """
-    txt_dir_path: Path = Path(txt_dir)
-    pdf_dir_path: Path = Path(pdf_dir)
-    processed_txt_dir = txt_dir_path / "processed"
-    raw_txt_dir = txt_dir_path / "raw"
-    os.makedirs(processed_txt_dir, exist_ok=True)
+    txt_dir: Path = Path("./data/test")
+    output_dir: Path = Path("./data/to_split_v2")
+    os.makedirs(output_dir, exist_ok=True)
 
-    for raw_txt_file_path in raw_txt_dir.glob("*.txt"):
-        pdf_textbook_dirname = raw_txt_file_path.stem
-        meta_path = pdf_dir_path / pdf_textbook_dirname / "meta.json"
-
+    for txt_data_dir in txt_dir.iterdir():
+        meta_path = txt_data_dir / "meta.json"
         if not meta_path.exists():
             continue
 
@@ -203,11 +178,15 @@ def main(pdf_dir: str, txt_dir: str) -> None:
             processing_config = json.load(f)
 
         patterns = TextProcessingPatterns.from_config(processing_config)
+        print(patterns)
         processor = TextFileProcessor(patterns)
-        processor.process_file(
-            raw_txt_file_path, processed_txt_dir / raw_txt_file_path.name
-        )
+        output_subdir = output_dir / txt_data_dir.name
+        os.makedirs(output_subdir, exist_ok=True)
+
+        for txt_file in txt_data_dir.iterdir():
+            if txt_file.is_file() and txt_file.suffix != ".json":
+                processor.process_file(txt_file, output_subdir / txt_file.name)
 
 
 if __name__ == "__main__":
-    main()
+    clear_txt()
