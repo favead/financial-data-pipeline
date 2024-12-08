@@ -97,3 +97,6 @@ models/*
 
 # Poetry stuff
 poetry.lock
+
+# Sensetive info
+configs/bks_params.json
