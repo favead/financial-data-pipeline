@@ -10,6 +10,9 @@ def html2txt() -> None:
     """
     html_data_dirs = Path("./data/courses")
     output_dir = Path("./data/txt_data")
+    h = html2text.HTML2Text()
+    h.ignore_links = True
+    h.ignore_images = True
     for data_dir in html_data_dirs.iterdir():
         output_data_dir = output_dir / data_dir.name
         os.makedirs(output_data_dir, exist_ok=True)
@@ -18,7 +21,7 @@ def html2txt() -> None:
                 continue
             with open(file, "r") as f:
                 content = f.read()
-            transformed = html2text.html2text(content)
+            transformed = h.handle(content)
             output_path = output_data_dir / file.stem
             with open(f"{output_path}.txt", "w") as f:
                 f.write(transformed)
