@@ -90,11 +90,11 @@ def process_documents_in_directory(directory: Path):
         all_documents.extend(documents)
 
     stats = collect_statistics(all_documents)
-    entities = perform_ner(all_documents)
-    plot_statistics(stats, entities)
+    # entities = perform_ner(all_documents)
+    plot_statistics(stats, entities=None)
 
 
-def plot_statistics(stats: Dict[str, Any], entities: Counter):
+def plot_statistics(stats: Dict[str, Any], entities: Counter | None = None):
     total_documents = stats["total_documents"]
     total_tokens = stats["total_tokens"]
     total_sentences = stats["total_sentences"]
@@ -141,6 +141,7 @@ def plot_statistics(stats: Dict[str, Any], entities: Counter):
     ax.set_xlabel("Entity")
     ax.set_ylabel("Frequency")
     plt.tight_layout()
+    plt.xticks(rotation=90)
     plt.savefig("./data/artifacts/top_ner_entities.png")
 
     return None
