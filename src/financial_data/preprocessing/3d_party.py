@@ -20,6 +20,8 @@ def process_3d_party_data() -> None:
                 data = json.load(f)
             actual_laws = get_relevant_laws(data)
             documents = transform_to_documents(actual_laws)
+            for document in documents:
+                document.metadata["source"] = file.name
             save_documents_to_jsonl(
                 documents, output_dir / f"{file.stem}.jsonl"
             )
@@ -27,10 +29,7 @@ def process_3d_party_data() -> None:
 
 
 def get_relevant_laws(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    actual_codexes = [
-        "Налоговый кодекс (НК РФ)",
-        "Бюджетный кодекс (БК РФ)",
-    ]
+    actual_codexes = ["Уголовный кодекс (УК РФ)"]
     return filter(lambda item: item["name_codex"] in actual_codexes, data)
 
 
