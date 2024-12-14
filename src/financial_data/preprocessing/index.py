@@ -8,6 +8,9 @@ from langchain_community.vectorstores.faiss import DistanceStrategy
 from ..utils.jsonl import load_documents_from_jsonl
 
 
+MODEL_PATH = "intfloat/multilingual-e5-small"
+
+
 def index_chunks() -> None:
     """
     Indexing chunks in directory and save it to FAISS database
@@ -16,9 +19,8 @@ def index_chunks() -> None:
     output_dir = Path("./data/index")
     os.makedirs(output_dir, exist_ok=True)
 
-    model_path = "intfloat/multilingual-e5-small"
     embeddings = HuggingFaceEmbeddings(
-        model_name=model_path,
+        model_name=MODEL_PATH,
         multi_process=True,
         encode_kwargs={"normalize_embeddings": True},
     )
