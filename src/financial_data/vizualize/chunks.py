@@ -36,6 +36,7 @@ def collect_statistics(
     total_sentences = 0
     metadata_counter = Counter()
     tokens_per_document = []
+    tokens_per_source = {}
     sentences_per_document = []
 
     for doc in documents:
@@ -44,12 +45,22 @@ def collect_statistics(
         tokens_per_document.append(len(tokens))
         total_tokens += len(tokens)
 
+        try:
+            tokens_per_source[doc.metadata["source"]] += [len(tokens)]
+        except KeyError:
+            tokens_per_source[doc.metadata["source"]] = [len(tokens)]
+
         sentences = text.split(".")
         sentences_per_document.append(len(sentences))
         total_sentences += len(sentences)
 
         for key, value in doc.metadata.items():
             metadata_counter[key] += 1
+
+    mean_tokens_per_source = {
+        k: sum(v) / len(v) for k, v in tokens_per_source.items()
+    }
+    sum_tokens_per_source = {k: sum(v) for k, v in tokens_per_source.items()}
 
     return {
         "total_documents": total_documents,
@@ -58,6 +69,8 @@ def collect_statistics(
         "metadata_aggregation": metadata_counter,
         "tokens_per_document": tokens_per_document,
         "sentences_per_document": sentences_per_document,
+        "tokens_per_source": sum_tokens_per_source,
+        "mean_tokens_per_source": mean_tokens_per_source,
     }
 
 
@@ -81,7 +94,7 @@ def perform_ner(documents: List[Document]) -> Counter:
     return entities_counter
 
 
-def process_documents_in_directory(directory: Path):
+def process_documents_in_directory(directory: Path) -> None:
     jsonl_files = [f for f in directory.glob("*.jsonl")]
     all_documents = []
 
@@ -90,11 +103,14 @@ def process_documents_in_directory(directory: Path):
         all_documents.extend(documents)
 
     stats = collect_statistics(all_documents)
-    # entities = perform_ner(all_documents)
-    plot_statistics(stats, entities=None)
+    entities = perform_ner(all_documents)
+    plot_statistics(stats, entities=entities)
+    return None
 
 
-def plot_statistics(stats: Dict[str, Any], entities: Counter | None = None):
+def plot_statistics(
+    stats: Dict[str, Any], entities: Counter | None = None
+) -> None:
     total_documents = stats["total_documents"]
     total_tokens = stats["total_tokens"]
     total_sentences = stats["total_sentences"]
@@ -105,44 +121,68 @@ def plot_statistics(stats: Dict[str, Any], entities: Counter | None = None):
         "Total Sentences": [total_sentences],
     }
     comb_stat = pd.DataFrame.from_dict(df)
-    comb_stat.to_csv("./data/artifacts/combined_statistics.csv", index=False)
+    comb_stat.to_csv("./artifacts/combined_statistics.csv", index=False)
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(8, 5))
     ax.bar(range(total_documents), stats["tokens_per_document"])
     ax.set_title("Tokens per Document")
     ax.set_xlabel("Document")
     ax.set_ylabel("Tokens")
+    plt.xticks(rotation=90)
     plt.tight_layout()
-    plt.savefig("./data/artifacts/tokens_per_document.png")
+    plt.savefig("./artifacts/tokens_per_document.png")
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(8, 5))
     ax.bar(range(total_documents), stats["sentences_per_document"])
     ax.set_title("Sentences per Document")
     ax.set_xlabel("Document")
     ax.set_ylabel("Sentences")
+    plt.xticks(rotation=90)
     plt.tight_layout()
-    plt.savefig("./data/artifacts/sentences_per_document.png")
+    plt.savefig("./artifacts/sentences_per_document.png")
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(8, 5))
     metadata = stats["metadata_aggregation"]
     ax.bar(metadata.keys(), metadata.values())
     ax.set_title("Metadata Aggregation")
     ax.set_xlabel("Metadata Key")
     ax.set_ylabel("Frequency")
-    plt.tight_layout()
-    plt.savefig("./data/artifacts/metadata_aggregation.png")
-
-    top_entities = entities.most_common(50)
-    labels, counts = zip(*top_entities)
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(labels, counts)
-    ax.set_title("Top 50 NER Entity Frequency")
-    ax.set_xlabel("Entity")
-    ax.set_ylabel("Frequency")
-    plt.tight_layout()
     plt.xticks(rotation=90)
-    plt.savefig("./data/artifacts/top_ner_entities.png")
+    plt.tight_layout()
+    plt.savefig("./artifacts/metadata_aggregation.png")
+
+    _, ax = plt.subplots(figsize=(8, 5))
+    tokens_per_source = stats["tokens_per_source"]
+    ax.bar(tokens_per_source.keys(), tokens_per_source.values())
+    ax.set_title("Tokens per source")
+    ax.set_xlabel("Source name")
+    ax.set_ylabel("Tokens")
+    plt.xticks(rotation=90)
+    plt.tight_layout()
+    plt.savefig("./artifacts/tokens_per_source.png")
+
+    _, ax = plt.subplots(figsize=(8, 5))
+    tokens_per_source = stats["mean_tokens_per_source"]
+    ax.bar(tokens_per_source.keys(), tokens_per_source.values())
+    ax.set_title("Mean tokens per source")
+    ax.set_xlabel("Source name")
+    ax.set_ylabel("Tokens")
+    plt.xticks(rotation=90)
+    plt.tight_layout()
+    plt.savefig("./artifacts/mean_tokens_per_source.png")
+
+    if entities:
+        top_entities = entities.most_common(50)
+        labels, counts = zip(*top_entities)
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.bar(labels, counts)
+        ax.set_title("Top 50 NER Entity Frequency")
+        ax.set_xlabel("Entity")
+        ax.set_ylabel("Frequency")
+        plt.xticks(rotation=90)
+        plt.tight_layout()
+        plt.savefig("./artifacts/top_ner_entities.png")
 
     return None
 
