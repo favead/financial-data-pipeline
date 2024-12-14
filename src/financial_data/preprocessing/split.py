@@ -35,9 +35,6 @@ class ChunkSplitter:
     ) -> MarkdownHeaderTextSplitter:
         return MarkdownHeaderTextSplitter(**splitter_config)
 
-    def squeeze(self, documents: List[Document]) -> List[Document]:
-        pass
-
 
 def split_documents_by_dir(
     data_dir: Path,
@@ -55,6 +52,8 @@ def split_documents_by_dir(
         for filepath in files_dir.iterdir():
             if filepath.is_file() and filepath.suffix != ".json":
                 chunks = splitter.split(filepath, splitter_config)
+                for chunk in chunks:
+                    chunk.metadata["source"] = dirname
                 chunks_meta[dirname].extend(chunks)
     return chunks_meta
 
