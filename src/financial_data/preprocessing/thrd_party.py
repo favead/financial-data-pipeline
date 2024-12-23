@@ -6,10 +6,12 @@ from langchain_core.documents import Document
 from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
 )
+from prefect import flow, task
 
 from ..utils.jsonl import save_documents_to_jsonl
 
 
+@flow
 def process_3d_party_data() -> None:
     data_dir: Path = Path("./data/3d_party")
     output_dir: Path = Path("./data/chunks")
@@ -28,11 +30,13 @@ def process_3d_party_data() -> None:
     return None
 
 
+@task
 def get_relevant_laws(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
     actual_codexes = ["Уголовный кодекс (УК РФ)"]
     return filter(lambda item: item["name_codex"] in actual_codexes, data)
 
 
+@task
 def transform_to_documents(
     data: List[Dict[str, str]],
     chunk_size: int = 700,
