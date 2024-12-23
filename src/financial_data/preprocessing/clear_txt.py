@@ -5,6 +5,8 @@ from pathlib import Path
 import re
 from typing import Dict, List, Optional, Pattern, Tuple, Union
 
+from prefect import flow, task
+
 
 @dataclass
 class RegexPattern:
@@ -125,6 +127,7 @@ class TextFileProcessor:
     def __init__(self, patterns: TextProcessingPatterns):
         self.line_processor = TextLineProcessor(patterns)
 
+    @task
     def process_file(self, input_path: Path, output_path: Path) -> None:
         print(f"Processing text data from {input_path}")
 
@@ -157,6 +160,7 @@ class TextFileProcessor:
             f.write(result)
 
 
+@flow
 def clear_txt() -> None:
     """
     Preprocess text data from raw txt files with cleaning configuration,

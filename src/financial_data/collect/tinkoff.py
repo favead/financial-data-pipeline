@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List
 
+from prefect import task, flow
 import requests
 
 from ..utils.parsing import load_content
@@ -20,6 +21,7 @@ COURSE_DATA_CLASSES = [
 ]
 
 
+@task
 def get_courses_links() -> List[str]:
     response = requests.get(COURSES_URL)
     soup = load_content(response)
@@ -30,6 +32,7 @@ def get_courses_links() -> List[str]:
     return [link["href"] for link in links]
 
 
+@task
 def get_course_parts_links(course_href: str) -> List[str]:
     response = requests.get(BASE_URL + course_href)
     soup = load_content(response)
@@ -38,6 +41,7 @@ def get_course_parts_links(course_href: str) -> List[str]:
     return course_parts_links
 
 
+@task
 def parse_course_part(course_part_link: str) -> str:
     response = requests.get(BASE_URL + course_part_link)
     soup = load_content(response)
@@ -50,6 +54,7 @@ def parse_course_part(course_part_link: str) -> str:
     return course_content
 
 
+@flow
 def parse_tinkoff_courses() -> None:
     courses_links = get_courses_links()
     courses_parts_links = [

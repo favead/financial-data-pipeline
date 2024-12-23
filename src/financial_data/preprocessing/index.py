@@ -4,6 +4,7 @@ from pathlib import Path
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.vectorstores.faiss import DistanceStrategy
+from prefect import flow
 
 from ..utils.jsonl import load_documents_from_jsonl
 
@@ -11,6 +12,7 @@ from ..utils.jsonl import load_documents_from_jsonl
 MODEL_PATH = "intfloat/multilingual-e5-small"
 
 
+@flow
 def index_chunks() -> None:
     """
     Indexing chunks in directory and save it to FAISS database

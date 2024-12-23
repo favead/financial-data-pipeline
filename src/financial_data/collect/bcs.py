@@ -3,6 +3,7 @@ from pathlib import Path
 import time
 from typing import Dict, List, Optional, Tuple
 
+from prefect import flow, task
 import requests
 
 from ..utils.parsing import load_content
@@ -16,18 +17,21 @@ COURSE_DATA_ID = "content"
 COURSE_DATA_CLASS = "TjB6 KSLV Ncpb ZKPa"
 
 
+@task
 def load_request_params() -> Tuple[Dict[str, str], Dict[str, str]]:
     with open(str(REQUEST_PARAMS_PATH), "r") as f:
         request_params = json.load(f)
     return request_params["cookies"], request_params["headers"]
 
 
+@task
 def get_courses_links() -> List[str]:
     response = requests.get(COURSES_DATA_URL)
     data = response.json()["data"]
     return [item["url"] for item in data]
 
 
+@task
 def get_course_parts_links(
     course_link: str, cookies: Dict[str, str], headers: Dict[str, str]
 ) -> List[str]:
@@ -37,6 +41,7 @@ def get_course_parts_links(
     return list(filter(lambda x: BASE_URL in x, hrefs))
 
 
+@task
 def parse_course_part(
     course_part_link: str, cookies: Dict[str, str], headers: Dict[str, str]
 ) -> Optional[str]:
@@ -51,7 +56,8 @@ def parse_course_part(
     return content
 
 
-def parse_bks_courses() -> None:
+@flow
+def parse_bcs_courses() -> None:
     cookies, headers = load_request_params()
     timeout = 1.0
     courses_links = get_courses_links()
@@ -74,4 +80,4 @@ def parse_bks_courses() -> None:
 
 
 if __name__ == "__main__":
-    parse_bks_courses()
+    parse_bcs_courses()

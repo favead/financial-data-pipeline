@@ -2,8 +2,10 @@ import os
 from pathlib import Path
 
 import html2text
+from prefect import flow
 
 
+@flow
 def html2txt() -> None:
     """
     Convert html files to txt with md format

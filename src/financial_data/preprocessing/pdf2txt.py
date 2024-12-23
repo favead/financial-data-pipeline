@@ -1,9 +1,11 @@
 import os
 from pathlib import Path
 
+from prefect import flow, task
 import pymupdf4llm
 
 
+@task
 def convert_pdf_to_txt(pdf_file_path: Path, txt_file_path: Path) -> None:
     """
     Convert PDF file to text file in markdown format via pymupdf4llm.
@@ -15,6 +17,7 @@ def convert_pdf_to_txt(pdf_file_path: Path, txt_file_path: Path) -> None:
     return None
 
 
+@task
 def get_pdf_file(textbook_dir: Path) -> Path | None:
     """
     Extract pdf file from textbook directory.
@@ -28,6 +31,7 @@ def get_pdf_file(textbook_dir: Path) -> Path | None:
     return pdf_file_path
 
 
+@flow
 def pdf2txt() -> None:
     """
     Convert PDF files to text files.

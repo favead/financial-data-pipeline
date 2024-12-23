@@ -1,4 +1,5 @@
 from prefect import flow
+
 from .collect import parse_bcs_courses, parse_tinkoff_courses
 from .preprocessing import (
     clear_txt,

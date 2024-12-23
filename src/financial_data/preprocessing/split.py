@@ -7,6 +7,7 @@ from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
+from prefect import flow, task
 
 from ..utils.jsonl import save_documents_to_jsonl
 
@@ -20,6 +21,7 @@ class ChunkSplitter:
             chunk_size=chunk_size, chunk_overlap=int(0.15 * chunk_size)
         )
 
+    @task
     def split(
         self, filepath: Path, splitter_config: Dict[str, Any]
     ) -> List[Document]:
@@ -36,6 +38,7 @@ class ChunkSplitter:
         return MarkdownHeaderTextSplitter(**splitter_config)
 
 
+@task
 def split_documents_by_dir(
     data_dir: Path,
     chunk_size: int = 1500,
@@ -58,6 +61,7 @@ def split_documents_by_dir(
     return chunks_meta
 
 
+@flow
 def split_documents() -> None:
     """
     Split documents from /data/to_split directory to chunks
