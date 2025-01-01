@@ -18,7 +18,9 @@ class ChunkSplitter:
         chunk_size: int,
     ) -> None:
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size, chunk_overlap=int(0.15 * chunk_size)
+            separators=["."],
+            chunk_size=chunk_size,
+            chunk_overlap=int(0.15 * chunk_size),
         )
 
     @task
@@ -41,7 +43,7 @@ class ChunkSplitter:
 @task
 def split_documents_by_dir(
     data_dir: Path,
-    chunk_size: int = 1500,
+    chunk_size: int = 2500,
 ) -> None:
     splitter = ChunkSplitter(chunk_size)
     chunks_meta = {}
