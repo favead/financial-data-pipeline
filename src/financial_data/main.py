@@ -11,10 +11,14 @@ from .preprocessing import (
 
 
 @flow
-def run_pipeline() -> None:
-    parse_bcs_courses(),
+def collect_data() -> None:
+    parse_bcs_courses()
     parse_tinkoff_courses()
-    pdf2txt()
+    return None
+
+
+@flow
+def clear_data() -> None:
     clear_txt()
     process_3d_party_data()
     split_documents()
@@ -23,4 +27,6 @@ def run_pipeline() -> None:
 
 
 if __name__ == "__main__":
-    run_pipeline()
+    collect_data()
+    pdf2txt()
+    clear_data()
