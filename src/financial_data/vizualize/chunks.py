@@ -3,27 +3,14 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from typing import Any, List, Dict
 
-import langdetect
 from langchain_core.documents import Document
 import pandas as pd
-from transformers import pipeline, AutoTokenizer
+from transformers import AutoTokenizer
 
 from ..utils.jsonl import (
     load_documents_from_jsonl,
 )
-
-ner_en = pipeline(
-    "ner", model="dbmdz/bert-large-cased-finetuned-conll03-english"
-)
-ner_ru = pipeline("ner", model="Gherman/bert-base-NER-Russian")
-
-
-def detect_language(text: str) -> str:
-    try:
-        lang = langdetect.detect(text)
-        return lang
-    except Exception:
-        return "unknown"
+from ..utils.text_processer import TextProcesser
 
 
 def collect_statistics(
@@ -74,22 +61,16 @@ def collect_statistics(
     }
 
 
-def perform_ner(documents: List[Document]) -> Counter:
+def perform_words_count(
+    documents: List[Document], text_processer: TextProcesser
+) -> Counter:
     entities_counter = Counter()
 
     for doc in documents:
         text = doc.page_content
-        lang = detect_language(text)
-
-        if lang == "en":
-            ner_results = ner_en(text)
-        elif lang == "ru":
-            ner_results = ner_ru(text)
-        else:
-            continue
-
-        for ent in ner_results:
-            entities_counter[ent["word"]] += 1
+        words = text_processer.process_text(text)
+        for ent in words:
+            entities_counter[ent] += 1
 
     return entities_counter
 
@@ -103,13 +84,14 @@ def process_documents_in_directory(directory: Path) -> None:
         all_documents.extend(documents)
 
     stats = collect_statistics(all_documents)
-    entities = perform_ner(all_documents)
-    plot_statistics(stats, entities=entities)
+    text_processer = TextProcesser()
+    common_words = perform_words_count(all_documents, text_processer)
+    plot_statistics(stats, common_words=common_words)
     return None
 
 
 def plot_statistics(
-    stats: Dict[str, Any], entities: Counter | None = None
+    stats: Dict[str, Any], common_words: Counter | None = None
 ) -> None:
     total_documents = stats["total_documents"]
     total_tokens = stats["total_tokens"]
@@ -171,18 +153,18 @@ def plot_statistics(
     plt.tight_layout()
     plt.savefig("./artifacts/mean_tokens_per_source.png")
 
-    if entities:
-        top_entities = entities.most_common(50)
+    if common_words:
+        top_entities = common_words.most_common(50)
         labels, counts = zip(*top_entities)
 
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.bar(labels, counts)
-        ax.set_title("Top 50 NER Entity Frequency")
+        ax.set_title("Top 50 Word Frequency")
         ax.set_xlabel("Entity")
         ax.set_ylabel("Frequency")
         plt.xticks(rotation=90)
         plt.tight_layout()
-        plt.savefig("./artifacts/top_ner_entities.png")
+        plt.savefig("./artifacts/top_common_words.png")
 
     return None
 
