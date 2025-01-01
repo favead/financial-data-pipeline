@@ -33,13 +33,15 @@ def process_3d_party_data() -> None:
 @task
 def get_relevant_laws(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
     actual_codexes = ["Уголовный кодекс (УК РФ)"]
-    return filter(lambda item: item["name_codex"] in actual_codexes, data)
+    return list(
+        filter(lambda item: item["name_codex"] in actual_codexes, data)
+    )
 
 
 @task
 def transform_to_documents(
     data: List[Dict[str, str]],
-    chunk_size: int = 700,
+    chunk_size: int = 1500,
 ) -> List[Document]:
     documents = []
     splitter = RecursiveCharacterTextSplitter(
@@ -47,6 +49,7 @@ def transform_to_documents(
     )
     for item in data:
         content = item.pop("content_article")
+        item["source"] = item["name_article"]
         document = Document(content, metadata=item)
         documents.append(document)
     documents = splitter.split_documents(documents)
