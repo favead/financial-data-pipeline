@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import re
 from typing import Dict, List, Optional, Pattern, Tuple, Union
 
-from ..storages import DocumentStorage, initialize_storage
+from ..storages import initialize_storage
 
 
 @dataclass
@@ -81,21 +81,24 @@ class TextLineProcessor:
         return not self._check_inline_patterns(line) and len(line.strip()) > 0
 
     def check_before_first_chapter(self, line: str) -> bool:
-        return bool(
-            self.patterns.before_first_chapter
-            and self.patterns.before_first_chapter.search(line)
+        return (
+            self.patterns.before_first_chapter.search(line)
+            if self.patterns.before_first_chapter
+            else True
         )
 
     def check_after_last_chapter(self, line: str) -> bool:
-        return bool(
-            self.patterns.after_last_chapter
-            and self.patterns.after_last_chapter.search(line)
+        return (
+            self.patterns.after_last_chapter.search(line)
+            if self.patterns.after_last_chapter
+            else False
         )
 
     def check_chapter_start(self, line: str) -> bool:
-        return bool(
-            self.patterns.chapter_separator
-            and self.patterns.chapter_separator.search(line)
+        return (
+            self.patterns.chapter_separator.search(line)
+            if self.patterns.chapter_separator
+            else True
         )
 
     def _check_inline_patterns(self, line: str) -> bool:
@@ -156,6 +159,7 @@ def clear_txt() -> None:
     raw_documents = document_storage.get_raw_documents()
 
     for raw_document in raw_documents:
+        raw_doc_id = str(raw_document["_id"])
         source_name = raw_document["source_name"]
         processing_config = config_storage.get_config(source_name)
         patterns = TextProcessingPatterns.from_config(processing_config)
@@ -163,19 +167,9 @@ def clear_txt() -> None:
         processed_document = processor.process_document(
             raw_document["content"]
         )
-        save_to_storage(
-            document_storage,
-            source_name,
-            processed_document,
+        document_storage.set_processed_document(
+            source_name, processed_document, raw_doc_id
         )
-
-
-def save_to_storage(
-    document_storage: DocumentStorage,
-    source_name: str,
-    processed_document: str,
-) -> None:
-    document_storage.set_processed_document(source_name, processed_document)
     return None
 
 

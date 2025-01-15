@@ -1,6 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional, Union
 
+from bson import ObjectId
 from langchain_core.documents import Document
 from pymongo import MongoClient, collection
 
@@ -40,19 +41,7 @@ class DocumentStorage:
     ) -> Optional[str]:
         return collection.find_one({"source_name": source_name})
 
-    def set_raw_document(self, source_name: str, document: str) -> None:
-        self._set_document_by_collection(
-            source_name, document, self.raw_collection
-        )
-        return None
-
-    def set_processed_document(self, source_name: str, document: str) -> None:
-        self._set_document_by_collection(
-            source_name, document, self.processed_collection
-        )
-        return None
-
-    def _set_document_by_collection(
+    def set_raw_document(
         self,
         source_name: str,
         document: str,
@@ -64,6 +53,16 @@ class DocumentStorage:
             collection.insert_one(
                 {"source_name": source_name, "content": document},
             )
+        return None
+
+    def set_processed_document(
+        self, source_name: str, document: str, _id: str
+    ) -> None:
+        self.processed_collection.update_one(
+            {"_id": ObjectId(_id)},
+            {"$set": {"source_name": source_name, "content": document}},
+            upsert=True,
+        )
         return None
 
 

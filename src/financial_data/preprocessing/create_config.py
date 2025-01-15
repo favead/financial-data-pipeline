@@ -36,10 +36,6 @@ DEFAULT_BCS_CONFIG = {
 
 DEFAULT_TEXTBOOK_CONFIG = {
     "remove_patterns": {
-        "before_first_chapter": None,
-        "after_last_chapter": None,
-        "chapter_separator": None,
-        "in_chapters": [],
         "inline_patterns": [
             {"pattern": "Рис."},
             {"pattern": "\\[.*?\\]\\(https?:\\/\\/[^\\)]+\\)"},

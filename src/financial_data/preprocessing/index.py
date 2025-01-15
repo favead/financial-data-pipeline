@@ -5,7 +5,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.vectorstores.faiss import DistanceStrategy
 
-from ..utils.jsonl import load_documents_from_jsonl
+from ..storages import initialize_storage
 
 
 MODEL_PATH = "intfloat/multilingual-e5-small"
@@ -15,7 +15,6 @@ def index_chunks() -> None:
     """
     Indexing chunks in directory and save it to FAISS database
     """
-    input_dir = Path("./data/chunks")
     output_dir = Path("./data/index")
     os.makedirs(output_dir, exist_ok=True)
 
@@ -25,13 +24,10 @@ def index_chunks() -> None:
         encode_kwargs={"normalize_embeddings": True},
     )
 
-    documents = []
-    for filepath in input_dir.iterdir():
-        if filepath.is_file() and filepath.suffix == ".jsonl":
-            documents.extend(load_documents_from_jsonl(filepath))
-
+    chunk_storage = initialize_storage("chunk")
+    chunks = chunk_storage.get_chunks()
     faiss_cosine = FAISS.from_documents(
-        documents, embeddings, distance_strategy=DistanceStrategy.COSINE
+        chunks, embeddings, distance_strategy=DistanceStrategy.COSINE
     )
     faiss_cosine.save_local(str(output_dir))
     return None

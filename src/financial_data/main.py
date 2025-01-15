@@ -32,18 +32,14 @@ def process_data() -> None:
 
 
 def collect_metrics() -> None:
-    collect_eda_metrics()
     collect_data_quality_metrics()
-    return None
-
-
-def reindex_chunks() -> None:
-    index_chunks()
+    collect_eda_metrics()
     return None
 
 
 if __name__ == "__main__":
-    # collect_data()
+    collect_data()
     transform_data()
     process_data()
     collect_metrics()
+    index_chunks()

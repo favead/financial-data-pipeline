@@ -25,7 +25,7 @@ def process_3d_party_data() -> None:
             actual_laws = get_relevant_laws(data)
             documents = transform_to_documents(actual_laws)
             for document in documents:
-                document.metadata["source"] = file.name
+                document.metadata["source_name"] = file.name
             save_to_storage(chunk_storage, documents)
     return None
 
