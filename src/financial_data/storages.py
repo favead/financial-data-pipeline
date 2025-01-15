@@ -38,18 +38,17 @@ class DocumentStorage:
     def _get_document_by_name_and_collection(
         self, source_name: str, collection: collection.Collection
     ) -> Optional[str]:
-        result = collection.find_one({"name": source_name})
-        return result
+        return collection.find_one({"source_name": source_name})
 
     def set_raw_document(self, source_name: str, document: str) -> None:
         self._set_document_by_collection(
-            self, source_name, document, self.raw_collection
+            source_name, document, self.raw_collection
         )
         return None
 
     def set_processed_document(self, source_name: str, document: str) -> None:
         self._set_document_by_collection(
-            self, source_name, document, self.processed_collection
+            source_name, document, self.processed_collection
         )
         return None
 
@@ -60,7 +59,9 @@ class DocumentStorage:
         collection: collection.Collection,
     ) -> None:
         collection.update_one(
-            {"name": source_name}, document, {"upsert": True}
+            {"source_name": source_name},
+            {"$set": {"content": document}},
+            upsert=True,
         )
         return None
 
@@ -75,11 +76,23 @@ class ChunkStorage:
 
     def get_chunk(self, chunk_id: str) -> Optional[Document]:
         doc_obj = self.collection.find_one({"chunk_id": chunk_id})
-        return Document(**doc_obj) if doc_obj else doc_obj
+        return Document(**doc_obj) if doc_obj else None
+
+    def get_chunks(self) -> List[Document]:
+        chunks = list(self.collection.find({}))
+        return [Document(**chunk) for chunk in chunks]
+
+    def get_chunks_by_source(self, source_name: str) -> List[Document]:
+        chunks = list(
+            self.collection.find({"metadata.source_name": source_name})
+        )
+        return [Document(**chunk) for chunk in chunks]
 
     def set_chunk(self, chunk_id: str, chunk: Document) -> None:
-        self.collection.insert_one(
-            {"chunk_id": chunk_id, **chunk.model_dump(mode="python")}
+        chunk_data = chunk.model_dump(mode="python")
+        chunk_data["chunk_id"] = chunk_id
+        self.collection.update_one(
+            {"chunk_id": chunk_id}, {"$set": chunk_data}, upsert=True
         )
         return None
 
@@ -93,27 +106,48 @@ class MetricStorage:
         self.collection = self.db[collection_name]
 
     def set_metric(self, metric: Dict[str, Any]) -> None:
-        existing_metric = self.collection.find_one({"name": metric["name"]})
-        if existing_metric:
-            self.collection.update_one(
-                {"source_name": metric["source_name"]},
-                {"$set": metric},
-                upsert=False,
-            )
-        else:
-            self.collection.insert_one(metric)
+        self.collection.update_one(
+            {"source_name": metric["source_name"]},
+            {"$set": metric},
+            upsert=True,
+        )
         return None
+
+    def get_metrics(self) -> List[Dict[str, Any]]:
+        return list(self.collection.find({}))
 
     def get_metric_by_source_name(
         self, source_name: str
     ) -> Optional[Dict[str, Any]]:
-        metric = self.collection.find_one({"source_name": source_name})
-        return metric
+        return self.collection.find_one({"source_name": source_name})
+
+    def get_metrics_by_type(self, metric_type: str) -> List[Dict[str, Any]]:
+        return list(self.collection.find({"metric_type": metric_type}))
+
+
+class ConfigStorage:
+    def __init__(
+        self, host: str, port: int, db_name: str, collection_name: str
+    ) -> None:
+        self.client = MongoClient(host, port)
+        self.db = self.client[db_name]
+        self.collection = self.db[collection_name]
+
+    def get_config(self, source_name: str) -> Optional[Dict[str, Any]]:
+        return self.collection.find_one({"source_name": source_name})
+
+    def set_config(self, source_name: str, config: Dict[str, Any]) -> None:
+        self.collection.update_one(
+            {"source_name": source_name},
+            {"$set": config},
+            upsert=True,
+        )
+        return None
 
 
 def initialize_storage(
     storage_type: str,
-) -> Union[DocumentStorage, ChunkStorage, MetricStorage]:
+) -> Union[DocumentStorage, ChunkStorage, MetricStorage, ConfigStorage]:
     if storage_type == "document":
         return DocumentStorage(
             os.getenv("MongoHost"),
@@ -135,6 +169,13 @@ def initialize_storage(
             int(os.getenv("MongoPort")),
             os.getenv("DBName"),
             os.getenv("MetricsCollectionName"),
+        )
+    elif storage_type == "config":
+        return ConfigStorage(
+            os.getenv("MongoHost"),
+            int(os.getenv("MongoPort")),
+            os.getenv("DBName"),
+            os.getenv("ConfigCollectionName"),
         )
     else:
         raise ValueError("This storage type doesn't exists!")
