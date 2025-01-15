@@ -21,6 +21,21 @@ COURSE_DATA_CLASSES = [
 ]
 
 
+@flow
+def parse_tinkoff_courses() -> None:
+    courses_links = get_courses_links()
+    courses_parts_links = [
+        get_course_parts_links(course_link) for course_link in courses_links
+    ]
+    for i in range(len(courses_parts_links)):
+        for j, course_part_link in enumerate(courses_parts_links[i]):
+            course_content = parse_course_part(course_part_link)
+            if course_content:
+                with open(OUTPUT_DIR / f"{i}_{j}.html", "w") as f:
+                    f.write(course_content)
+    return None
+
+
 @task
 def get_courses_links() -> List[str]:
     response = requests.get(COURSES_URL)
@@ -52,21 +67,6 @@ def parse_course_part(course_part_link: str) -> str:
             return course_content
         course_content += element.prettify()
     return course_content
-
-
-@flow
-def parse_tinkoff_courses() -> None:
-    courses_links = get_courses_links()
-    courses_parts_links = [
-        get_course_parts_links(course_link) for course_link in courses_links
-    ]
-    for i in range(len(courses_parts_links)):
-        for j, course_part_link in enumerate(courses_parts_links[i]):
-            course_content = parse_course_part(course_part_link)
-            if course_content:
-                with open(OUTPUT_DIR / f"{i}_{j}.html", "w") as f:
-                    f.write(course_content)
-    return None
 
 
 if __name__ == "__main__":

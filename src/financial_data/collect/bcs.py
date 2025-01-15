@@ -17,6 +17,29 @@ COURSE_DATA_ID = "content"
 COURSE_DATA_CLASS = "TjB6 KSLV Ncpb ZKPa"
 
 
+@flow
+def parse_bcs_courses() -> None:
+    cookies, headers = load_request_params()
+    timeout = 1.0
+    courses_links = get_courses_links()
+    course_part_links = []
+    for course_link in courses_links:
+        time.sleep(timeout)
+        course_part_links.append(
+            get_course_parts_links(course_link, cookies, headers)
+        )
+    for i in range(len(course_part_links)):
+        for j, course_part_link in enumerate(course_part_links[i]):
+            time.sleep(timeout)
+            course_part_content = parse_course_part(
+                course_part_link, cookies, headers
+            )
+            if course_part_content:
+                with open(OUTPUT_DIR / f"{i}_{j}.html", "w") as f:
+                    f.write(course_part_content)
+    return None
+
+
 @task
 def load_request_params() -> Tuple[Dict[str, str], Dict[str, str]]:
     with open(str(REQUEST_PARAMS_PATH), "r") as f:
@@ -54,29 +77,6 @@ def parse_course_part(
     if div_tag:
         content = div_tag.prettify()
     return content
-
-
-@flow
-def parse_bcs_courses() -> None:
-    cookies, headers = load_request_params()
-    timeout = 1.0
-    courses_links = get_courses_links()
-    course_part_links = []
-    for course_link in courses_links:
-        time.sleep(timeout)
-        course_part_links.append(
-            get_course_parts_links(course_link, cookies, headers)
-        )
-    for i in range(len(course_part_links)):
-        for j, course_part_link in enumerate(course_part_links[i]):
-            time.sleep(timeout)
-            course_part_content = parse_course_part(
-                course_part_link, cookies, headers
-            )
-            if course_part_content:
-                with open(OUTPUT_DIR / f"{i}_{j}.html", "w") as f:
-                    f.write(course_part_content)
-    return None
 
 
 if __name__ == "__main__":
