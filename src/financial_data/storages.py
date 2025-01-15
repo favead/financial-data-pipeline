@@ -58,11 +58,12 @@ class DocumentStorage:
         document: str,
         collection: collection.Collection,
     ) -> None:
-        collection.update_one(
-            {"source_name": source_name},
-            {"$set": {"content": document}},
-            upsert=True,
-        )
+        if not collection.find_one(
+            {"source_name": source_name, "content": document}
+        ):
+            collection.insert_one(
+                {"source_name": source_name, "content": document},
+            )
         return None
 
 
