@@ -2,7 +2,6 @@ import os
 import re
 from typing import Any, Dict, List
 
-from prefect import flow, task
 import requests
 
 from ..storages import initialize_storage
@@ -58,7 +57,6 @@ DEFAULT_TEXTBOOK_CONFIG = {
 }
 
 
-@flow
 def create_configs() -> None:
     document_storage = initialize_storage("document")
     raw_documents = document_storage.get_raw_documents()
@@ -79,7 +77,6 @@ def create_configs() -> None:
     return None
 
 
-@task
 def get_remove_patterns_by_document(raw_document: str) -> Dict[str, Any]:
     """
     Функция для наполнения конфигурационного файла для очистки документа
@@ -90,7 +87,6 @@ def get_remove_patterns_by_document(raw_document: str) -> Dict[str, Any]:
     return {}
 
 
-@task
 def generate(
     prompt: str,
     max_new_tokens: int = 2048,
@@ -116,7 +112,6 @@ def generate(
     return model_output
 
 
-@task
 def collect_headers(txt_path: str) -> List[str]:
     pattern = re.Pattern("")
     headers = []

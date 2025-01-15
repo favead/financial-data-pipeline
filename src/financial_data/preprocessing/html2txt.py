@@ -1,12 +1,10 @@
 from pathlib import Path
 
 import html2text
-from prefect import flow, task
 
 from ..storages import initialize_storage, DocumentStorage
 
 
-@flow
 def html2txt() -> None:
     """
     Convert html files to txt with md format
@@ -29,7 +27,6 @@ def html2txt() -> None:
             save_to_storage(document_storage, source_name, transformed)
 
 
-@task
 def save_to_storage(
     document_storage: DocumentStorage, source_name: str, document: str
 ) -> None:

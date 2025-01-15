@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from prefect import flow, task
 import pymupdf4llm
 
 from ..storages import DocumentStorage, initialize_storage
@@ -10,7 +9,6 @@ from ..utils.log import get_logger
 log = get_logger(__name__)
 
 
-@flow
 def pdf2txt() -> None:
     """
     Convert PDF files to text files.
@@ -29,7 +27,6 @@ def pdf2txt() -> None:
     return None
 
 
-@task
 def get_pdf_file(textbook_dir: Path) -> Path | None:
     """
     Extract pdf file from textbook directory.
@@ -43,7 +40,6 @@ def get_pdf_file(textbook_dir: Path) -> Path | None:
     return pdf_file_path
 
 
-@task
 def convert_pdf_to_txt(pdf_file_path: Path) -> str:
     """
     Convert PDF file to text file in markdown format via pymupdf4llm.
@@ -53,7 +49,6 @@ def convert_pdf_to_txt(pdf_file_path: Path) -> str:
     return md_data
 
 
-@task
 def save_to_storage(
     document_storage: DocumentStorage, source_name: str, raw_txt_file_path: str
 ) -> None:

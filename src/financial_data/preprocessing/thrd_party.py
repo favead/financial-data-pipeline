@@ -7,7 +7,6 @@ from langchain_core.documents import Document
 from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
 )
-from prefect import flow, task
 
 from ..storages import (
     ChunkStorage,
@@ -15,7 +14,6 @@ from ..storages import (
 )
 
 
-@flow
 def process_3d_party_data() -> None:
     data_dir: Path = Path("./data/3d_party")
     chunk_storage = initialize_storage("chunk")
@@ -32,7 +30,6 @@ def process_3d_party_data() -> None:
     return None
 
 
-@task
 def get_relevant_laws(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
     actual_codexes = ["Уголовный кодекс (УК РФ)"]
     return list(
@@ -40,7 +37,6 @@ def get_relevant_laws(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
     )
 
 
-@task
 def transform_to_documents(
     data: List[Dict[str, str]],
     chunk_size: int = 1500,
@@ -59,7 +55,6 @@ def transform_to_documents(
     return documents
 
 
-@task
 def save_to_storage(
     chunk_storage: ChunkStorage, documents: List[Document]
 ) -> None:

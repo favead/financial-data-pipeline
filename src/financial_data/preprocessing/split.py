@@ -7,7 +7,6 @@ from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
-from prefect import flow, task
 
 from ..storages import ChunkStorage, initialize_storage
 
@@ -37,7 +36,6 @@ class ChunkSplitter:
             chunk_overlap=int(0.15 * chunk_size),
         )
 
-    @task
     def split(
         self, filepath: Path, splitter_config: Dict[str, Any]
     ) -> List[Document]:
@@ -54,7 +52,6 @@ class ChunkSplitter:
         return MarkdownHeaderTextSplitter(**splitter_config)
 
 
-@flow
 def split_documents() -> None:
     """
     Split documents from /data/to_split directory to chunks
@@ -71,7 +68,6 @@ def split_documents() -> None:
     return None
 
 
-@task
 def split_documents_by_dir(
     processed_documents: List[str],
     chunk_size: int = 2500,
@@ -89,7 +85,6 @@ def split_documents_by_dir(
     return chunks_meta
 
 
-@task
 def save_to_storage(
     chunk_storage: ChunkStorage, chunks: List[Document]
 ) -> None:

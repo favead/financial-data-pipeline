@@ -2,8 +2,6 @@ from dataclasses import dataclass
 import re
 from typing import Dict, List, Optional, Pattern, Tuple, Union
 
-from prefect import flow, task
-
 from ..storages import DocumentStorage, initialize_storage
 
 
@@ -126,7 +124,6 @@ class TextFileProcessor:
     def __init__(self, patterns: TextProcessingPatterns):
         self.line_processor = TextLineProcessor(patterns)
 
-    @task
     def process_document(self, document: str) -> str:
         processed_text = []
         total_length = 0
@@ -148,7 +145,6 @@ class TextFileProcessor:
         return result
 
 
-@flow
 def clear_txt() -> None:
     """
     Preprocess text data from raw txt files with cleaning configuration,
@@ -174,7 +170,6 @@ def clear_txt() -> None:
         )
 
 
-@task
 def save_to_storage(
     document_storage: DocumentStorage,
     source_name: str,
