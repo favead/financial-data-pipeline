@@ -1,6 +1,6 @@
-import json
 from pathlib import Path
 from typing import Any, Dict, List
+import uuid
 
 from langchain_core.documents import Document
 from langchain_text_splitters import (
@@ -9,7 +9,21 @@ from langchain_text_splitters import (
 )
 from prefect import flow, task
 
-from ..utils.jsonl import save_documents_to_jsonl
+from ..storages import ChunkStorage, initialize_storage
+
+
+SPLIT_CONFIG = {
+    "headers_to_split_on": [
+        ["#", "H1"],
+        ["##", "H2"],
+        ["###", "H3"],
+        ["####", "H4"],
+        ["#####", "H5"],
+        ["######", "H6"],
+        ["#######", "H7"],
+        ["########", "H8"],
+    ]
+}
 
 
 class ChunkSplitter:
@@ -40,42 +54,47 @@ class ChunkSplitter:
         return MarkdownHeaderTextSplitter(**splitter_config)
 
 
-@task
-def split_documents_by_dir(
-    data_dir: Path,
-    chunk_size: int = 2500,
-) -> None:
-    splitter = ChunkSplitter(chunk_size)
-    chunks_meta = {}
-    for files_dir in data_dir.iterdir():
-        dirname = files_dir.name
-        chunks_meta[dirname] = []
-        splitter_config_path = list(files_dir.glob("*.json"))
-        assert len(splitter_config_path) == 1
-        with open(splitter_config_path[0], "r") as f:
-            splitter_config = json.load(f)
-        for filepath in files_dir.iterdir():
-            if filepath.is_file() and filepath.suffix != ".json":
-                chunks = splitter.split(filepath, splitter_config)
-                for chunk in chunks:
-                    chunk.metadata["source"] = dirname
-                chunks_meta[dirname].extend(chunks)
-    return chunks_meta
-
-
 @flow
 def split_documents() -> None:
     """
     Split documents from /data/to_split directory to chunks
     and store it in /data/chunks
     """
-    data_dir: Path = Path("./data/to_split")
-    output_dir: Path = Path("./data/chunks")
-    chunks_meta: Dict[str, List[Document]] = split_documents_by_dir(data_dir)
-    for dirname, chunk_docs in chunks_meta.items():
-        save_documents_to_jsonl(
-            chunk_docs, str(output_dir / f"{dirname}.jsonl")
-        )
+    document_storage = initialize_storage("document")
+    chunk_storage = initialize_storage("chunk")
+    processed_documents = document_storage.get_processed_documents()
+    chunks_meta: Dict[str, List[Document]] = split_documents(
+        processed_documents
+    )
+    for chunk_docs in chunks_meta.items():
+        save_to_storage(chunk_storage, chunk_docs)
+    return None
+
+
+@task
+def split_documents_by_dir(
+    processed_documents: List[str],
+    chunk_size: int = 2500,
+) -> Dict[str, List[Document]]:
+    splitter = ChunkSplitter(chunk_size)
+    chunks_meta = {}
+    for document in processed_documents:
+        if document["source_name"] not in chunks_meta:
+            chunks_meta[document["source_name"]] = []
+        chunks = splitter.split(document, SPLIT_CONFIG)
+        for chunk in chunks:
+            chunk.metadata["source_name"] = document["source_name"]
+            chunk.metadata["id"] = str(uuid.uuid4())
+        chunks_meta[document["source_name"]].extend(chunks)
+    return chunks_meta
+
+
+@task
+def save_to_storage(
+    chunk_storage: ChunkStorage, chunks: List[Document]
+) -> None:
+    for chunk in chunks:
+        chunk_storage.set_chunk(chunk.metadata["id"], chunk)
     return None
 
 
