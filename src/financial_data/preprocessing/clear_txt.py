@@ -161,7 +161,7 @@ def clear_txt() -> None:
         patterns = TextProcessingPatterns.from_config(processing_config)
         processor = TextFileProcessor(patterns)
         processed_document = processor.process_document(
-            raw_document["document"]
+            raw_document["content"]
         )
         save_to_storage(
             document_storage,
