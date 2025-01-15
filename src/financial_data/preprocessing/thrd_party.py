@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Dict, List
+import uuid
 
 from langchain_core.documents import Document
 from langchain_text_splitters import (
@@ -8,13 +9,16 @@ from langchain_text_splitters import (
 )
 from prefect import flow, task
 
-from ..utils.jsonl import save_documents_to_jsonl
+from ..storages import (
+    ChunkStorage,
+    initialize_storage,
+)
 
 
 @flow
 def process_3d_party_data() -> None:
     data_dir: Path = Path("./data/3d_party")
-    output_dir: Path = Path("./data/chunks")
+    chunk_storage = initialize_storage("chunk")
 
     for file in data_dir.iterdir():
         if file.is_file() and file.suffix == ".json":
@@ -24,9 +28,7 @@ def process_3d_party_data() -> None:
             documents = transform_to_documents(actual_laws)
             for document in documents:
                 document.metadata["source"] = file.name
-            save_documents_to_jsonl(
-                documents, output_dir / f"{file.stem}.jsonl"
-            )
+            save_to_storage(chunk_storage, documents)
     return None
 
 
@@ -50,10 +52,20 @@ def transform_to_documents(
     for item in data:
         content = item.pop("content_article")
         item["source"] = item["name_article"]
+        item["id"] = str(uuid.uuid4())
         document = Document(content, metadata=item)
         documents.append(document)
     documents = splitter.split_documents(documents)
     return documents
+
+
+@task
+def save_to_storage(
+    chunk_storage: ChunkStorage, documents: List[Document]
+) -> None:
+    for document in documents:
+        chunk_storage.set_chunk(document.metadata["id"], document)
+    return None
 
 
 if __name__ == "__main__":
