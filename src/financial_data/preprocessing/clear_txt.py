@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-import json
-import os
-from pathlib import Path
 import re
 from typing import Dict, List, Optional, Pattern, Tuple, Union
 
 from prefect import flow, task
+
+from ..storages import DocumentStorage, initialize_storage
 
 
 @dataclass
@@ -128,36 +127,25 @@ class TextFileProcessor:
         self.line_processor = TextLineProcessor(patterns)
 
     @task
-    def process_file(self, input_path: Path, output_path: Path) -> None:
-        print(f"Processing text data from {input_path}")
-
+    def process_document(self, document: str) -> str:
         processed_text = []
         total_length = 0
 
-        with open(input_path, "r", encoding="utf-8") as f:
-            for line in f:
-                total_length += len(line)
-                if self.line_processor.check_before_first_chapter(line):
-                    self.line_processor.before_first_chapter_passed = True
-                if not self.line_processor.before_first_chapter_passed:
-                    continue
-                if self.line_processor.check_after_last_chapter(line):
-                    break
-                if self.line_processor.check_chapter_start(line):
-                    self.line_processor.current_chapter = None
-                if self.line_processor.should_process_line(line):
-                    processed_text.append(line)
+        for line in document.splitlines():
+            total_length += len(line)
+            if self.line_processor.check_before_first_chapter(line):
+                self.line_processor.before_first_chapter_passed = True
+            if not self.line_processor.before_first_chapter_passed:
+                continue
+            if self.line_processor.check_after_last_chapter(line):
+                break
+            if self.line_processor.check_chapter_start(line):
+                self.line_processor.current_chapter = None
+            if self.line_processor.should_process_line(line):
+                processed_text.append(line)
 
-        result = "".join(processed_text)
-        result_len = len(result)
-
-        print(
-            f"Original file length: {total_length}, "
-            f"processed file length: {result_len}"
-        )
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(result)
+        result = "\n".join(processed_text)
+        return result
 
 
 @flow
@@ -167,26 +155,33 @@ def clear_txt() -> None:
     which is specified in the meta.json file in each textbook directory.
     After processing, save the processed text to the processed directory.
     """
-    txt_dir: Path = Path("./data/txt_data")
-    output_dir: Path = Path("./data/to_split")
-    os.makedirs(output_dir, exist_ok=True)
+    document_storage = initialize_storage("document")
+    config_storage = initialize_storage("config")
+    raw_documents = document_storage.get_raw_documents()
 
-    for txt_data_dir in txt_dir.iterdir():
-        meta_path = txt_data_dir / "meta.json"
-        if not meta_path.exists():
-            continue
-
-        with open(meta_path, "r") as f:
-            processing_config = json.load(f)
-
+    for raw_document in raw_documents:
+        source_name = raw_document["source_name"]
+        processing_config = config_storage.get_config(source_name)
         patterns = TextProcessingPatterns.from_config(processing_config)
-        output_subdir = output_dir / txt_data_dir.name
-        os.makedirs(output_subdir, exist_ok=True)
+        processor = TextFileProcessor(patterns)
+        processed_document = processor.process_document(
+            raw_document["document"]
+        )
+        save_to_storage(
+            document_storage,
+            source_name,
+            processed_document,
+        )
 
-        for txt_file in txt_data_dir.iterdir():
-            if txt_file.is_file() and txt_file.suffix != ".json":
-                processor = TextFileProcessor(patterns)
-                processor.process_file(txt_file, output_subdir / txt_file.name)
+
+@task
+def save_to_storage(
+    document_storage: DocumentStorage,
+    source_name: str,
+    processed_document: str,
+) -> None:
+    document_storage.set_processed_document(source_name, processed_document)
+    return None
 
 
 if __name__ == "__main__":
