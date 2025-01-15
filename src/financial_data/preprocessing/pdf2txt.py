@@ -1,19 +1,31 @@
-import os
 from pathlib import Path
 
 from prefect import flow, task
 import pymupdf4llm
 
+from ..storages import DocumentStorage, initialize_storage
+from ..utils.log import get_logger
 
-@task
-def convert_pdf_to_txt(pdf_file_path: Path, txt_file_path: Path) -> None:
+
+log = get_logger(__name__)
+
+
+@flow
+def pdf2txt() -> None:
     """
-    Convert PDF file to text file in markdown format via pymupdf4llm.
+    Convert PDF files to text files.
     """
-    print(f"Converting {pdf_file_path} to {txt_file_path}")
-    with open(txt_file_path, "wb") as f:
-        md_data = pymupdf4llm.to_markdown(pdf_file_path)
-        f.write(md_data.encode("utf-8"))
+    pdf_dir: Path = Path("./data/pdf_textbooks")
+    document_storage = initialize_storage("document")
+
+    for textbook_dir in pdf_dir.iterdir():
+        if not textbook_dir.is_dir():
+            continue
+        pdf_file = get_pdf_file(textbook_dir)
+        if pdf_file is None:
+            continue
+        md_data = convert_pdf_to_txt(pdf_file)
+        save_to_storage(document_storage, str(textbook_dir.name), md_data)
     return None
 
 
@@ -31,23 +43,26 @@ def get_pdf_file(textbook_dir: Path) -> Path | None:
     return pdf_file_path
 
 
-@flow
-def pdf2txt() -> None:
+@task
+def convert_pdf_to_txt(pdf_file_path: Path) -> str:
     """
-    Convert PDF files to text files.
+    Convert PDF file to text file in markdown format via pymupdf4llm.
     """
-    pdf_dir: Path = Path("./data/pdf_textbooks")
-    txt_dir: Path = Path("./data/txt_data")
-    for i, textbook_dir in enumerate(pdf_dir.iterdir()):
-        if not textbook_dir.is_dir():
-            continue
-        pdf_file = get_pdf_file(textbook_dir)
-        if pdf_file is None:
-            continue
-        txt_file_dir = txt_dir / textbook_dir.name
-        os.makedirs(txt_file_dir, exist_ok=True)
-        raw_txt_file_path = txt_file_dir / f"{i}.txt"
-        convert_pdf_to_txt(pdf_file, raw_txt_file_path)
+    log.info(f"Converting {pdf_file_path}")
+    md_data = pymupdf4llm.to_markdown(pdf_file_path)
+    return md_data
+
+
+@task
+def save_to_storage(
+    document_storage: DocumentStorage, source_name: str, raw_txt_file_path: str
+) -> None:
+    """
+    Save txt data to document storage
+    """
+    with open(raw_txt_file_path, "r", encoding="utf-8") as f:
+        data = f.read()
+        document_storage.set_raw_document(source_name, data)
     return None
 
 
