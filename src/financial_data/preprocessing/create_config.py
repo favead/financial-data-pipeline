@@ -1,27 +1,93 @@
 import os
-from pathlib import Path
 import re
-from typing import List
+from typing import Any, Dict, List
+
 from prefect import flow, task
 import requests
 
-
-LLM_API_URL = ""
-MODEL_ID = ""
+from ..storages import initialize_storage
 
 
-FIND_FIRST_CHAPTER_PROMPT = """
-"""
+LLM_API_URL = "https://api.mistral.ai/v1/chat/completions"
+MODEL_ID = "mistral-7b-instruct"
+
+
+DEFAULT_TINKOFF_CONFIG = {
+    "remove_patterns": {
+        "before_first_chapter": "#",
+        "after_last_chapter": "##  Что дальше",
+        "chapter_separator": "##",
+    }
+}
+
+
+DEFAULT_BCS_CONFIG = {
+    "remove_patterns": {
+        "before_first_chapter": "# ",
+        "after_last_chapter": "Жмите «Далее»",
+        "chapter_separator": "##",
+        "inline_patterns": [
+            {"pattern": "Обсудить  Нравится"},
+            {"pattern": "Поделиться"},
+            {"pattern": "**БКС Мир инвестиций**"},
+        ],
+    }
+}
+
+
+DEFAULT_TEXTBOOK_CONFIG = {
+    "remove_patterns": {
+        "before_first_chapter": None,
+        "after_last_chapter": None,
+        "chapter_separator": None,
+        "in_chapters": [],
+        "inline_patterns": [
+            {"pattern": "Рис."},
+            {"pattern": "\\[.*?\\]\\(https?:\\/\\/[^\\)]+\\)"},
+            {"pattern": "-+"},
+            {"pattern": "http"},
+            {"pattern": "\\*\\*FIGURE \\d+\\.\\d+"},
+            {"pattern": "_Рис"},
+            {"pattern": "_Figure"},
+            {"pattern": "_Source"},
+            {"pattern": "-+"},
+            {"pattern": "www."},
+            {"pattern": "EP-CM&SL"},
+        ],
+    }
+}
 
 
 @flow
 def create_configs() -> None:
-    txt_dir = Path("./data/txt_data")
-    for txt_data_dir in txt_dir.iterdir():
-        for txt_filepath in txt_data_dir.iterdir():
-            if txt_filepath.is_file():
-                txt_headers = collect_headers(txt_filepath)
+    document_storage = initialize_storage("document")
+    raw_documents = document_storage.get_raw_documents()
+    config_storage = initialize_storage("config")
+    for raw_document in raw_documents:
+        if raw_document["source_name"] == "tinkoff":
+            config = DEFAULT_TINKOFF_CONFIG
+            config_storage.set_config(raw_document["source_name"], config)
+        elif raw_document["source_name"] == "bcs":
+            config = DEFAULT_BCS_CONFIG
+            config_storage.set_config(raw_document["source_name"], config)
+        else:
+            remove_patterns = get_remove_patterns_by_document(raw_document)
+            config = DEFAULT_TEXTBOOK_CONFIG
+            if remove_patterns:
+                config.update(remove_patterns)
+            config_storage.set_config(raw_document["source_name"], config)
     return None
+
+
+@task
+def get_remove_patterns_by_document(raw_document: str) -> Dict[str, Any]:
+    """
+    Функция для наполнения конфигурационного файла для очистки документа
+    от нерелевантной информации.
+
+    Пока что не реализовано.
+    """
+    return {}
 
 
 @task
