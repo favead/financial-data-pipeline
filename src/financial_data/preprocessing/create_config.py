@@ -59,21 +59,19 @@ DEFAULT_TEXTBOOK_CONFIG = {
 
 def create_configs() -> None:
     document_storage = initialize_storage("document")
-    raw_documents = document_storage.get_raw_documents()
     config_storage = initialize_storage("config")
-    for raw_document in raw_documents:
-        if raw_document["source_name"] == "tinkoff":
+    raw_documents = document_storage.get_raw_documents()
+    source_names = set(
+        [raw_document["source_name"] for raw_document in raw_documents]
+    )
+    for source_name in source_names:
+        if source_name == "tinkoff":
             config = DEFAULT_TINKOFF_CONFIG
-            config_storage.set_config(raw_document["source_name"], config)
-        elif raw_document["source_name"] == "bcs":
+        elif source_name == "bcs":
             config = DEFAULT_BCS_CONFIG
-            config_storage.set_config(raw_document["source_name"], config)
         else:
-            remove_patterns = get_remove_patterns_by_document(raw_document)
             config = DEFAULT_TEXTBOOK_CONFIG
-            if remove_patterns:
-                config.update(remove_patterns)
-            config_storage.set_config(raw_document["source_name"], config)
+        config_storage.set_config(source_name, config)
     return None
 
 
