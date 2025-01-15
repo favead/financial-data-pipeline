@@ -50,14 +50,12 @@ def convert_pdf_to_txt(pdf_file_path: Path) -> str:
 
 
 def save_to_storage(
-    document_storage: DocumentStorage, source_name: str, raw_txt_file_path: str
+    document_storage: DocumentStorage, source_name: str, document: str
 ) -> None:
     """
     Save txt data to document storage
     """
-    with open(raw_txt_file_path, "r", encoding="utf-8") as f:
-        data = f.read()
-        document_storage.set_raw_document(source_name, data)
+    document_storage.set_raw_document(source_name, document)
     return None
 
 
